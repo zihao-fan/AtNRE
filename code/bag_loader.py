@@ -7,7 +7,7 @@ bag data loader for MIML
 """
 
 class loader:
-    def __init__(self, relation_file, label_data_file, unlabel_data_file = None, group_eval_data_file = None,
+    def __init__(self, relation_file, pos_file, dep_file, label_data_file, unlabel_data_file = None, group_eval_data_file = None,
                  embed_dir = None, word_dir = None,
                  n_vocab = 80000, valid_split = 1000, max_len = 119, split_seed = 0,
                  use_DS_data = True):
@@ -33,6 +33,10 @@ class loader:
         # relation index
         with open(relation_file, 'rb') as f:
             self.rel_ind = pickle.load(f)
+        with open(pos_file, 'rb') as f:
+            self.tag_ind = pickle.load(f)
+        with open(dep_file, 'rb') as f:
+            self.dep_ind = pickle.load(f)
         self.rel_name = dict()
         self.rel_num = len(self.rel_ind)
         for k,i in self.rel_ind.items():
@@ -44,8 +48,8 @@ class loader:
             label_data_file = [label_data_file]
         for i, fname in enumerate(label_data_file):
             with open(fname, 'rb') as f:
-                text, entity, pos, rel = pickle.load(f)
-            curr_data = [(t,e,p,self.rel_ind[r]) for t,e,p,r in zip(text,entity,pos,rel) if len(t)<max_len]
+                text, entity, pos, rel, tag, dep = pickle.load(f)
+            curr_data = [(t,e,p,self.rel_ind[r],stag,sdep) for t,e,p,r,stag,sdep in zip(text,entity,pos,rel,tag,dep) if len(t)<max_len]
             np.random.shuffle(curr_data)
             if i == 0:
                 # split valid data set
@@ -65,8 +69,8 @@ class loader:
                 unlabel_data_file = [unlabel_data_file]
             for fname in unlabel_data_file:
                 with open(fname, 'rb') as f:
-                    text, entity, pos, rel = pickle.load(f)
-                self.unlabel_data += [(t,e,p,self.rel_ind[r]) for t,e,p,r in zip(text,entity,pos,rel) if len(t)<max_len]
+                    text, entity, pos, rel, tag, dep = pickle.load(f)
+                self.unlabel_data += [(t,e,p,self.rel_ind[r],stag,sdep) for t,e,p,r,stag,sdep in zip(text,entity,pos,rel,tag,dep) if len(t)<max_len]
             print('  -> done! elapsed = {}'.format(time.time()-ts))
 
         # evaluation data
@@ -79,7 +83,7 @@ class loader:
                 G = pickle.load(f)
             for e, dat in G.items():
                 rel = set([self.rel_ind[r] for r in dat[0]])
-                mention = [(t, p) for t,p in zip(dat[1], dat[2]) if len(t)<max_len]
+                mention = [(t, p, tag, dep) for t,p,tag,dep in zip(dat[1], dat[2], dat[3], dat[4]) if len(t)<max_len]
                 if len(mention) > 0:
                     self.eval_data.append((rel,mention))
             print('  -> done! elapsed = {}'.format(time.time()-ts))
@@ -110,20 +114,20 @@ class loader:
     def group_data(self, raw_data, merge_by_entity = False):
         if len(raw_data) == 0:
             return []
-        # data: list of (t, e, p, r)
+        # data: list of (t, e, p, r, tag, dep)
         # return:
-        #    a list [(list of relation id, list of (text, position))]
+        #    a list [(list of relation id, list of (text, position, tag, dep))]
         if not merge_by_entity:
             # every single instance becomes a group
-            data = [([r], [(t, p)]) for t, e, p, r in raw_data]
+            data = [([r], [(t, p, tag, dep)]) for t, e, p, r, tag, dep in raw_data]
         else:
             # merge mentions by entity names
             group = dict()
-            for t,e,p,r in raw_data:
+            for t,e,p,r,tag,dep in raw_data:
                 if e not in group:
                     group[e] = (set(), [])
                 group[e][0].add(r)
-                group[e][1].append((t, p))
+                group[e][1].append((t, p, tag, dep))
             data = []
             for e, p in group.items():
                 rel = sorted(list(p[0]))
@@ -157,6 +161,16 @@ class loader:
             return self.word_ind[c]
         return self.unk
 
+    def ID_tag(self, c):
+        if c in self.tag_ind:
+            return self.tag_ind[c]
+        return self.tag_ind['<unk>']
+    
+    def ID_dep(self, c):
+        if c in self.dep_ind:
+            return self.dep_ind[c]
+        return self.dep_ind['<unk>']
+
     def new_epoch(self):
         np.random.shuffle(self.train_data)
         self.train_ptr = 0
@@ -186,8 +200,10 @@ class loader:
         curr_bags = [data[(curr_ptr + i) % n] for i in range(self.bag_batch)]
 
         batch_size = sum([len(d[1]) for d in curr_bags])
-        Y = np.zeros((self.bag_batch, self.rel_num), dtype=np.float32)
+        Y = np.zeros((self.bag_batch, self.rel_num), dtype=np.float32) #multi hot
         X = np.ones((batch_size, L), dtype=np.int32) * self.eos
+        X_tag = np.ones((batch_size, L), dtype=np.int32) * self.tag_ind['<eos>']
+        X_dep = np.ones((batch_size, L), dtype=np.int32) * self.dep_ind['<eos>']
         E = np.zeros((batch_size, L), dtype=np.int32)
         length = np.zeros((batch_size, ), dtype=np.int32)
         mask = np.zeros((batch_size, L), dtype=np.float32)
@@ -197,18 +213,22 @@ class loader:
 
         self.cached_pos = []
 
-        for i, bag in enumerate(curr_bags):
+        for i, bag in enumerate(curr_bags): # every bag
             rel = bag[0]
             for r in rel:
                 Y[i][r] = 1
             mention = bag[1]
             shapes[i] = k
-            for j in range(len(mention)):
-                text, pos = mention[j]
+            for j in range(len(mention)): # every mention
+                text, pos, tag, dep = mention[j]
                 length[k + j] = len(text) + 1
                 mask[k + j, : len(text)] = 1  # ignore the last eos symbol
                 for l, c in enumerate(text):
                     X[k + j, l] = self.ID(c)
+                for l, c in enumerate(tag):
+                    X_tag[k + j, l] = self.ID_tag(c)
+                for l, c in enumerate(dep):
+                    X_dep[k + j, l] = self.ID_dep(C)
                 X[k + j, len(text)] = self.eos
                 E[k + j, pos[0]:pos[1]] = 1
                 E[k + j, pos[2]:pos[3]] = 2
@@ -222,6 +242,6 @@ class loader:
         else:  # evaluation
             self.eval_ptr += self.bag_batch
 
-        return effective, X, Y, E, length, shapes, mask
+        return effective, X, X_tag, X_dep, Y, E, length, shapes, mask
 
 

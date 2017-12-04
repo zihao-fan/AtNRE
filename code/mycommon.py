@@ -146,7 +146,7 @@ def get_rnn_init_state(x, cell):
     # assume GRU Cell
     return x
 
-def get_embedding(X, embedding, dropout = None, is_training = None):
+def get_embedding(X, embedding, dropout=None, is_training=None):
     """
     Args:
         X:[batch, L]

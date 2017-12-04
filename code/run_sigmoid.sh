@@ -1,6 +1,6 @@
 #!/bin/bash
 
-file="model_bagrnn_adv"
+file="model_sigmoid"
 if [ $# -gt 0 ]; then
     file=$1
 fi

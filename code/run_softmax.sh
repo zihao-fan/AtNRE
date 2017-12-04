@@ -1,6 +1,6 @@
 #!/bin/bash
 
-file="model_bagrnn_adv"
+file="model_full_softmax"
 if [ $# -gt 0 ]; then
     file=$1
 fi
@@ -36,5 +36,7 @@ CUDA_VISIBLE_DEVICES=0 python3 bag_runner.py --name $file --epoch 10 \
     --clip_grad 10 \
     --gpu_usage 0.3 \
     --adv_eps 0.5 \
-    --dropout 0.5
+    --dropout 0.5 \
+    --softmax_loss \
+    --softmax_loss_size 1
     # --tune_embed

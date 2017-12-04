@@ -29,6 +29,8 @@ class MyLogger:
             print('Model-Type: {}'.format(model.cell_type), file=f)
             print('Kernel-Size: {}'.format(model.enc_dim), file=f)
             print('Feat-Size: {}'.format(model.rel_dim), file=f)
+            print('Tag-Size: {}'.format(model.tag_dim), file=f)
+            print('Dep-Size: {}'.format(model.dep_dim), file=f)
             if model.max_dist_embed is not None:
                 s = 'relative-pos-embed <max_dis={}>'.format(model.max_dist_embed)
             else:
@@ -105,7 +107,7 @@ class BagTrainer:
         loader = self.loader
         fd = dict(zip([self.is_training, self.learning_rate],
                       [(source == 'train'), self.lrate]))
-        self.effective, X, Y, E, length, shapes, mask = loader.next_batch(source)
+        self.effective, X, X_tag, X_dep, Y, E, length, shapes, mask = loader.next_batch(source)
 
         self.batch_size = X.shape[0]
 
@@ -116,6 +118,12 @@ class BagTrainer:
         fd[M.Y] = Y
         fd[M.length] = length
         fd[M.mask] = mask
+
+        if M.tag_dim is not None:
+            fd[M.tag] = X_tag
+
+        if M.tag_dim is not None:
+            fd[M.dep] = X_dep
 
         if self.adv_eps is not None:
             fd[M.adv_eps] = self.adv_eps

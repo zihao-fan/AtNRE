@@ -66,6 +66,8 @@ parser.add_argument('--softmax_loss_size', type=int, default=0,
 parser.add_argument('--max_dist_embed', type=int,
                     help='if specified, use relative distance embedding; otherwise, use one-hot indicator for entities')
 parser.add_argument('--warmstart', type=str)
+parser.add_argument('--tag_dim', type=int, default=None, help="POS Tag dimension")
+parser.add_argument('--dep_dim', type=int, default=None, help="Dep label dimension")
 args = parser.parse_args()
 ###
 
@@ -73,9 +75,11 @@ print('Load Data ...')
 ts = time.time()
 if args.dataset == 'naacl':
     loader = Loader(relation_file = '../data/relation_dict.pkl',
-                    label_data_file = ['../data/label_random.pkl', '../data/label_gabor.pkl'],
-                    unlabel_data_file = '../data/DS_noise.pkl',
-                    group_eval_data_file = '../data/slim_test_group.pkl',
+                    pos_file = '../data/tag_vocab.pkl',
+                    dep_file = '../data/dep_vocab.pkl',
+                    label_data_file = ['../data/label_random_new.pkl', '../data/label_gabor_new.pkl'],
+                    unlabel_data_file = '../data/DS_noise_new.pkl',
+                    group_eval_data_file = '../data/slim_test_group_new.pkl',
                     embed_dir = args.embed,
                     word_dir = args.dict,
                     n_vocab = args.vocab_size,
@@ -130,7 +134,10 @@ trainer = Trainer(model, loader,
                   sampled_loss = args.sampled_sigmoid_loss,
                   adv_eps = args.adv_eps)
 
-model.build(trainer.is_training, ent_dim = args.entity_dim,
+model.build(trainer.is_training, 
+            ent_dim = args.entity_dim,
+            tag_dim = args.tag_dim,
+            dep_dim = args.dep_dim,
             dropout_embed = args.dropout_embed)
 
 print('>>>>>> done! elapsed = {}'.format(time.time()-ts))

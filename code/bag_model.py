@@ -11,6 +11,8 @@ class BAGRNN_Model:
                  cat_n = 5,
                  sent_len = 120,
                  word_n = 80000,
+                 tag_n = 53,
+                 dep_n = 49,
                  extra_n = 3,
                  word_embed = None,
                  dropout = None,
@@ -34,6 +36,8 @@ class BAGRNN_Model:
         self.sent_len = sent_len
         self.pretrain_word_embed = word_embed
         self.word_n = word_n
+        self.tag_n = tag_n
+        self.dep_n = dep_n
         self.extra_n = extra_n
         self.dropout = dropout
         self.cell_type = cell_type
@@ -50,6 +54,8 @@ class BAGRNN_Model:
 
     def build(self, is_training,
               ent_dim = 3,
+              tag_dim = None,
+              dep_dim = None,
               dropout_embed = True):
         self.is_training = is_training
 
@@ -60,6 +66,8 @@ class BAGRNN_Model:
         enc_dim = self.enc_dim
         cell_type = self.cell_type
         dropout = self.dropout
+        self.tag_dim = tag_dim
+        self.dep_dim = dep_dim
 
         ###################################
         # create placeholders
@@ -69,6 +77,10 @@ class BAGRNN_Model:
         # input data
         self.X = tf.placeholder(tf.int32, [None, L])
         self.ent = tf.placeholder(tf.int32, [None, L])
+        if tag_dim is not None:
+            self.tag = tf.placeholder(tf.int32, [None, L])
+        if dep_dim is not None:
+            self.dep = tf.placeholder(tf.int32, [None, L])
         if self.max_dist_embed is not None:
             self.ent2 = tf.placeholder(tf.int32, [None, L])
         # labels
@@ -121,40 +133,63 @@ class BAGRNN_Model:
                                                              self.embed_dim],
                                               initializer=tf.random_normal_initializer(0,0.01))
             self.exclude_clip_vars.add(self.word_embed)
+        if tag_dim is not None:
+            self.tag_embed = tf.get_variable('tag_embed', [self.tag_n, tag_dim],
+                                             initializer=tf.random_normal_initializer(0,0.01))
+            self.exclude_clip_vars.add(self.tag_embed)
+        if dep_dim is not None:
+            self.dep_embed = tf.get_variable('dep_embed', [self.dep_n, dep_dim],
+                                             initializer=tf.random_normal_initializer(0,0.01))
+            self.exclude_clip_vars.add(self.dep_embed)
 
         ################################
         # discriminative model
         #####
         self.orig_inputs = orig_inputs = mc.get_embedding(self.X, self.word_embed,
-                                                          self.dropout if dropout_embed else None, self.is_training)
+                                                          self.dropout if dropout_embed else None, 
+                                                          self.is_training)
         if self.max_dist_embed is not None:
             dist1_embed = mc.get_embedding(self.ent, self.ent_embed,
-                                           self.dropout if dropout_embed else None, self.is_training)
+                                           self.dropout if dropout_embed else None, 
+                                           self.is_training)
             dist2_embed = mc.get_embedding(self.ent2, self.ent_embed,
-                                           self.dropout if dropout_embed else None, self.is_training)
+                                           self.dropout if dropout_embed else None, 
+                                           self.is_training)
             ent_inputs = tf.concat([dist1_embed, dist2_embed], axis=2)
         else:
             ent_inputs = mc.get_embedding(self.ent, self.ent_embed)  # [batch,L,dim]
+        if tag_dim is not None:
+            tag_inputs = mc.get_embedding(self.tag, self.tag_embed)
+        if dep_dim is not None:
+            dep_inputs = mc.get_embedding(self.dep, self.dep_embed)
 
         use_softmax_loss = self.use_softmax_loss
         use_full_softmax = self.use_full_softmax
         use_pcnn = self.use_pcnn
         pcnn_feat_size = self.enc_dim
 
-        def discriminative_net(word_inputs, name = 'discriminative-net', reuse = False,
-                                 only_pos_rel_loss = False):
+        def discriminative_net(word_inputs, 
+                               name = 'discriminative-net', 
+                               reuse = False,
+                               only_pos_rel_loss = False):
             with tf.variable_scope(name, reuse=reuse):
                 if only_pos_rel_loss:
                     pos_rel_mask = ph_Y
                     # when y = [0, 0, ..., 0]: pos_rel_mask = [1, 1, ..., 1]
                     # o.w. pos_rel_mask = y
-                    #na_flag = 1 - tf.reduce_max(ph_Y, axis=1, keep_dims=True)
-                    #pos_rel_mask = ph_Y + na_flag
-
-                inputs = tf.concat([word_inputs, ent_inputs], axis = 2)  # [batch, L, dim]
+                    # na_flag = 1 - tf.reduce_max(ph_Y, axis=1, keep_dims=True)
+                    # pos_rel_mask = ph_Y + na_flag
+                input_concat_list = [word_inputs, ent_inputs]
+                if tag_dim is not None:
+                    input_concat_list.append(tag_inputs)
+                if dep_inputs is not None:
+                    input_concat_list.append(dep_inputs)
+                inputs = tf.concat(input_concat_list, axis = 2)  # [batch, L, dim]
 
                 if not use_pcnn:  # use RNN
-                    outputs, states = mc.mybidrnn(inputs, length, enc_dim,
+                    outputs, states = mc.mybidrnn(inputs, 
+                                                  length, 
+                                                  enc_dim,
                                                   cell_name = cell_type,
                                                   scope = 'bidirect-rnn')
                     # sentence information
