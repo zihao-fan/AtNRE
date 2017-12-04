@@ -7,10 +7,10 @@ fi
 
 if [ ! -d ./model/$file ]; then
     mkdir ./model/$file
+    mkdir ./stats/$file
     mkdir ./log/$file
     mkdir ./log/$file/train
     mkdir ./log/$file/test
-    mkdir ./stats/$file
 fi
 
 #rm -r ./model/$file/*
@@ -34,7 +34,7 @@ CUDA_VISIBLE_DEVICES=0 python3 bag_runner.py --name $file --epoch 10 \
     --seed 57 \
     --test_split 1000 \
     --clip_grad 10 \
-    --gpu_usage 0.9 \
+    --gpu_usage 0.3 \
     --adv_eps 2 \
     --dropout 0.5
     # --tune_embed

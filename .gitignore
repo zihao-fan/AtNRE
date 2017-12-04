@@ -11,3 +11,6 @@ baseline/.ipynb_checkpoints/*
 baseline/model/*
 baseline/log/*
 baseline/pkl_data/*
+NYTdata/*
+naacl_data/*
+*DS_Store
