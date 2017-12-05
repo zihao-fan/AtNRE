@@ -182,7 +182,7 @@ class BAGRNN_Model:
                 input_concat_list = [word_inputs, ent_inputs]
                 if tag_dim is not None:
                     input_concat_list.append(tag_inputs)
-                if dep_inputs is not None:
+                if dep_dim is not None:
                     input_concat_list.append(dep_inputs)
                 inputs = tf.concat(input_concat_list, axis = 2)  # [batch, L, dim]
 

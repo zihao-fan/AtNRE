@@ -122,7 +122,7 @@ class BagTrainer:
         if M.tag_dim is not None:
             fd[M.tag] = X_tag
 
-        if M.tag_dim is not None:
+        if M.dep_dim is not None:
             fd[M.dep] = X_dep
 
         if self.adv_eps is not None:

@@ -228,7 +228,7 @@ class loader:
                 for l, c in enumerate(tag):
                     X_tag[k + j, l] = self.ID_tag(c)
                 for l, c in enumerate(dep):
-                    X_dep[k + j, l] = self.ID_dep(C)
+                    X_dep[k + j, l] = self.ID_dep(c)
                 X[k + j, len(text)] = self.eos
                 E[k + j, pos[0]:pos[1]] = 1
                 E[k + j, pos[2]:pos[3]] = 2

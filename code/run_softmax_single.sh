@@ -18,7 +18,7 @@ rm -r ./log/$file/train/*
 rm -r ./log/$file/test/*
 #rm -r ./stats/$file/*
 
-CUDA_VISIBLE_DEVICES=0 python3 bag_runner.py --name $file --epoch 10 \
+CUDA_VISIBLE_DEVICES=0 python3 bag_runner.py --name $file --epoch 6 \
     --lrate 0.001 \
     --embed ../data/vector_np_200d.pkl \
     --model_dir ./model/$file --log ./log/$file --eval_dir ./stats/$file \
@@ -30,7 +30,7 @@ CUDA_VISIBLE_DEVICES=0 python3 bag_runner.py --name $file --epoch 10 \
     --cat_n 5 \
     --cell_type gru \
     --lrate_decay 0 \
-    --report_rate 0.2 \
+    --report_rate 0.1 \
     --seed 57 \
     --test_split 1000 \
     --clip_grad 10 \

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-file="model_sigmoid"
+file="model_sigmoid_sample3"
 if [ $# -gt 0 ]; then
     file=$1
 fi
@@ -34,7 +34,8 @@ CUDA_VISIBLE_DEVICES=0 python3 bag_runner.py --name $file --epoch 6 \
     --seed 57 \
     --test_split 1000 \
     --clip_grad 10 \
-    --gpu_usage 0.3 \
+    --gpu_usage 0.32 \
     --adv_eps 0.5 \
-    --dropout 0.5
+    --dropout 0.5 \
+    --sampled_sigmoid_loss 3
     # --tune_embed
